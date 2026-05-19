@@ -1,0 +1,8 @@
+{
+  "name": "Remix: ROBOTIC",
+  "description": "AI-Powered Crypto Intelligence \u0026 Rug Detection",
+  "requestFramePermissions": [],
+  "majorCapabilities": [
+    "MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"
+  ]
+}
