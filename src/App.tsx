@@ -36,6 +36,7 @@ import HolderList from "./components/HolderList";
 import PriceChart from "./components/PriceChart";
 import AiRiskPanel from "./components/AiRiskPanel";
 import { FullAnalysisResponse, TrendingToken, ScanHistoryItem } from "./types";
+import { clientSideAnalyze, getClientTrending } from "./lib/clientScanner";
 
 export default function App() {
   // Input Controllers
@@ -70,16 +71,30 @@ export default function App() {
 
   const fetchTrendingAndHistory = async () => {
     try {
-      const trendingRes = await fetch("/api/trending");
-      if (trendingRes.ok) {
-        const tokens = await trendingRes.ok ? await trendingRes.json() : [];
-        setTrendingTokens(tokens);
+      try {
+        const trendingRes = await fetch("/api/trending");
+        if (trendingRes.ok) {
+          const tokens = await trendingRes.json();
+          setTrendingTokens(tokens);
+        } else {
+          setTrendingTokens(getClientTrending());
+        }
+      } catch (trendingErr) {
+        setTrendingTokens(getClientTrending());
       }
       
-      const historyRes = await fetch("/api/history");
-      if (historyRes.ok) {
-        const historyData = await historyRes.json();
-        setScanHistory(historyData);
+      try {
+        const historyRes = await fetch("/api/history");
+        if (historyRes.ok) {
+          const historyData = await historyRes.json();
+          setScanHistory(historyData);
+        } else {
+          const localHist = localStorage.getItem("rob_scan_history");
+          setScanHistory(localHist ? JSON.parse(localHist) : []);
+        }
+      } catch (histErr) {
+        const localHist = localStorage.getItem("rob_scan_history");
+        setScanHistory(localHist ? JSON.parse(localHist) : []);
       }
     } catch (err) {
       console.error("Historical data lookup failure:", err);
@@ -197,22 +212,59 @@ export default function App() {
     }
 
     try {
-      const response = await fetch("/api/analyze", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ address: addrToScan.trim(), chain: chainToScan }),
-      });
+      let fullAudit: FullAnalysisResponse | null = null;
+      let useClientFallback = false;
 
-      if (response.ok) {
-        const fullAudit: FullAnalysisResponse = await response.json();
+      try {
+        const response = await fetch("/api/analyze", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ address: addrToScan.trim(), chain: chainToScan }),
+        });
+
+        if (response.ok) {
+          fullAudit = await response.json();
+        } else {
+          useClientFallback = true;
+        }
+      } catch (err) {
+        useClientFallback = true;
+      }
+
+      // Dynamic CORS-friendly direct browser lookup and scanning if server is offline
+      if (useClientFallback) {
+        console.log("Robotic Server is currently offline. Executing core client-side scan modules directly in the browser...");
+        fullAudit = await clientSideAnalyze(addrToScan.trim(), chainToScan);
+        
+        // Save scan history to localStorage so it stays perfectly functional, dynamic, and persistent on Netlify/static hosts
+        const localHistRaw = localStorage.getItem("rob_scan_history");
+        const scanHistoryList: ScanHistoryItem[] = localHistRaw ? JSON.parse(localHistRaw) : [];
+        const existingIdx = scanHistoryList.findIndex(h => h.address.toLowerCase() === addrToScan.trim().toLowerCase());
+        if (existingIdx !== -1) {
+          scanHistoryList.splice(existingIdx, 1);
+        }
+        scanHistoryList.unshift({
+          address: addrToScan.trim(),
+          chain: chainToScan,
+          name: fullAudit.token.name,
+          symbol: fullAudit.token.symbol,
+          score: fullAudit.ai?.securityScore || 85,
+          time: new Date().toISOString()
+        });
+        if (scanHistoryList.length > 50) {
+          scanHistoryList.pop();
+        }
+        localStorage.setItem("rob_scan_history", JSON.stringify(scanHistoryList));
+      }
+
+      if (fullAudit) {
         setResult(fullAudit);
         setActiveTab('OVERVIEW');
-        triggerToast("Analysis completed successfully.");
-        // Re-fetch Scan Vault history to sync logs
+        triggerToast("Analysis completed successfully " + (useClientFallback ? "(Client Mode)" : ""));
+        // Re-fetch history to load state
         fetchTrendingAndHistory();
       } else {
-        const errorMsg = await response.json();
-        triggerToast(errorMsg?.details || "Failed to analyze contract address.");
+        triggerToast("Failed to analyze contract address.");
       }
     } catch (err: any) {
       triggerToast("Connection error during analysis.");
