@@ -18,16 +18,16 @@ export default function RoboBackground() {
   }, []);
 
   return (
-    <div className="fixed inset-0 overflow-hidden bg-[#020205] text-slate-400 pointer-events-none z-0">
+    <div className="fixed inset-0 overflow-hidden bg-transparent text-slate-400 pointer-events-none z-0 transition-all duration-500">
       {/* Sleek Ambient Light Gradients and Radial Grid */}
-      <div className="absolute top-[-10%] left-[-10%] w-[40%] h-[40%] bg-blue-600/10 blur-[120px] rounded-full pointer-events-none" />
-      <div className="absolute bottom-[-10%] right-[-10%] w-[40%] h-[40%] bg-purple-600/10 blur-[120px] rounded-full pointer-events-none" />
-      <div className="absolute inset-0 bg-[radial-gradient(circle_at_center,_#ffffff05_1px,_transparent_1px)] bg-[size:40px_40px] pointer-events-none" />
+      <div className="cyber-deco absolute top-[-10%] left-[-10%] w-[40%] h-[40%] bg-blue-600/10 blur-[120px] rounded-full pointer-events-none transition-all duration-500" />
+      <div className="cyber-deco absolute bottom-[-10%] right-[-10%] w-[40%] h-[40%] bg-purple-600/10 blur-[120px] rounded-full pointer-events-none transition-all duration-500" />
+      <div className="cyber-grid absolute inset-0 bg-[radial-gradient(circle_at_center,_#ffffff05_1px,_transparent_1px)] bg-[size:40px_40px] pointer-events-none transition-all duration-500" />
 
       {/* 2. Cyberpunk Radial Ambient Lights */}
-      <div className="absolute top-1/4 left-1/4 -translate-x-1/2 -translate-y-1/2 w-[500px] h-[500px] rounded-full bg-cyan-500/10 blur-[120px]" />
-      <div className="absolute bottom-1/4 right-1/4 translate-x-1/2 translate-y-1/2 w-[600px] h-[600px] rounded-full bg-purple-600/10 blur-[140px]" />
-      <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[800px] h-[800px] rounded-full bg-blue-500/5 blur-[160px]" />
+      <div className="cyber-deco absolute top-1/4 left-1/4 -translate-x-1/2 -translate-y-1/2 w-[500px] h-[500px] rounded-full bg-cyan-500/10 blur-[120px] transition-all duration-500" />
+      <div className="cyber-deco absolute bottom-1/4 right-1/4 translate-x-1/2 translate-y-1/2 w-[600px] h-[600px] rounded-full bg-purple-600/10 blur-[140px] transition-all duration-500" />
+      <div className="cyber-deco absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[800px] h-[800px] rounded-full bg-blue-500/5 blur-[160px] transition-all duration-500" />
 
       {/* 3. Floating Blockchain Data Particles */}
       <div className="absolute inset-0">
@@ -57,7 +57,7 @@ export default function RoboBackground() {
       </div>
 
       {/* 4. Scanning Radar Interface & Glowing Circuit Grid */}
-      <div className="absolute bottom-10 right-10 w-96 h-96 opacity-20 border border-cyan-500/20 rounded-full flex items-center justify-center">
+      <div className="cyber-radar absolute bottom-10 right-10 w-96 h-96 opacity-20 border border-cyan-500/20 rounded-full flex items-center justify-center transition-all duration-500">
         <div className="w-80 h-80 border border-purple-500/10 rounded-full flex items-center justify-center">
           <div className="w-64 h-64 border border-cyan-500/5 rounded-full" />
         </div>
@@ -75,7 +75,7 @@ export default function RoboBackground() {
       </div>
 
       {/* 5. Animated 3D Futuristic Robotics Centerpiece SVG */}
-      <div className="absolute right-[-10%] top-[10%] w-[55%] h-[80%] opacity-25 hidden xl:block select-none pointer-events-none">
+      <div className="cyber-svg absolute right-[-10%] top-[10%] w-[55%] h-[80%] opacity-25 hidden xl:block select-none pointer-events-none transition-all duration-500">
         <svg
           viewBox="0 0 800 1000"
           className="w-full h-full text-cyan-500 filter drop-shadow-[0_0_30px_rgba(6,182,212,0.15)]"
@@ -200,7 +200,7 @@ export default function RoboBackground() {
       </div>
       
       {/* 6. Dynamic matrix code rain effect */}
-      <div className="absolute left-6 top-1/4 select-none opacity-[0.03] font-mono text-[10px] leading-relaxed hidden md:block">
+      <div className="cyber-rain absolute left-6 top-1/4 select-none opacity-[0.03] font-mono text-[10px] leading-relaxed hidden md:block transition-all duration-500">
         <div>SYS_ADDR_INIT_0X00FEFA</div>
         <div>CHAIN_SOLONA_STABILIZED</div>
         <div>CACHED_MEMORY_ONLINE</div>

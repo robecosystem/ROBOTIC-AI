@@ -1,1 +1,245 @@
 @import "tailwindcss";
+@import "@solana/wallet-adapter-react-ui/styles.css";
+
+/* ==========================================================================
+   LIGHT MODE DESIGN THEME OVERRIDES
+   ========================================================================== */
+
+.light-theme {
+  background-color: #f8fafc !important; /* solid slate-50 background */
+  color: #334155 !important; /* slate-700 text body */
+}
+
+/* Base text color conversions */
+.light-theme .text-slate-300,
+.light-theme .text-slate-350,
+.light-theme .text-slate-400,
+.light-theme .text-slate-500 {
+  color: #475569 !important; /* soft dark slate gray */
+}
+
+.light-theme .text-white,
+.light-theme h1,
+.light-theme h2,
+.light-theme h3,
+.light-theme h4,
+.light-theme h5 {
+  color: #0f172a !important; /* rich charcoal black headings */
+}
+
+/* Background panel / card mappings */
+.light-theme .bg-white\/5,
+.light-theme .bg-black\/40,
+.light-theme .bg-slate-900\/60,
+.light-theme .bg-slate-950\/40,
+.light-theme .bg-slate-900\/20,
+.light-theme .bg-[#0c0510],
+.light-theme .bg-[#040409],
+.light-theme .bg-gradient-to-br,
+.light-theme .bg-[#0a0a0f] {
+  background-color: #ffffff !important;
+  background-image: none !important;
+  border-color: #e2e8f0 !important; /* slate-200 border */
+  box-shadow: 0 4px 10px -1px rgba(15, 23, 42, 0.05), 0 2px 4px -2px rgba(15, 23, 42, 0.05) !important;
+}
+
+/* Headers background mappings */
+.light-theme header,
+.light-theme .bg-slate-900\/60 {
+  background-color: #ffffff !important;
+  border-color: #cbd5e1 !important;
+  box-shadow: 0 4px 12px rgba(15, 23, 42, 0.03) !important;
+}
+
+/* Inputs and interactive items */
+.light-theme input,
+.light-theme select {
+  background-color: #f8fafc !important;
+  color: #0f172a !important;
+  border-color: #cbd5e1 !important;
+}
+
+.light-theme input::placeholder {
+  color: #94a3b8 !important; /* readable gray placeholder */
+}
+
+/* Border styles conversion */
+.light-theme .border-white\/10,
+.light-theme .border-white\/15,
+.light-theme .border-white\/5,
+.light-theme .border-slate-800\/65,
+.light-theme .border-slate-850,
+.light-theme .border-slate-800,
+.light-theme .border-slate-800\/60,
+.light-theme .border-slate-800\/40 {
+  border-color: #cbd5e1 !important; /* elegant clean borders */
+}
+
+/* Grid lines & lists */
+.light-theme .bg-slate-900\/30,
+.light-theme .bg-slate-900\/20,
+.light-theme .bg-slate-950,
+.light-theme .bg-slate-950\/20 {
+  background-color: #f8fafc !important;
+  border-color: #e2e8f0 !important;
+}
+
+.light-theme .hover\:bg-slate-900\/40:hover {
+  background-color: #f1f5f9 !important;
+}
+
+/* Sub-panels and specific gauges */
+.light-theme .border-b-white\/5,
+.light-theme .border-t-white\/5,
+.light-theme .border-b-slate-800\/60 {
+  border-color: #f1f5f9 !important;
+}
+
+/* High contrast tag styles */
+.light-theme .text-cyan-400 {
+  color: #0284c7 !important; /* dark cyan / azure sky */
+}
+.light-theme .text-cyan-300 {
+  color: #0369a1 !important;
+}
+.light-theme .text-pink-400 {
+  color: #db2777 !important; /* bright rose pink */
+}
+.light-theme .text-purple-400 {
+  color: #8b5cf6 !important; /* purple */
+}
+.light-theme .text-emerald-400 {
+  color: #10b981 !important; /* green emerald */
+}
+.light-theme .text-orange-400 {
+  color: #d97706 !important; /* amber copper */
+}
+.light-theme .text-indigo-400 {
+  color: #4f46e5 !important;
+}
+
+.light-theme .bg-cyan-500\/10,
+.light-theme .bg-cyan-400\/10 {
+  background-color: #e0f2fe !important;
+  color: #0369a1 !important;
+  border-color: #bae6fd !important;
+}
+
+.light-theme .bg-emerald-500\/10,
+.light-theme .bg-emerald-400\/10 {
+  background-color: #dcfce7 !important;
+  color: #15803d !important;
+  border-color: #bbf7d0 !important;
+}
+
+.light-theme .bg-rose-500\/10,
+.light-theme .bg-red-500\/10,
+.light-theme .bg-red-450\/10 {
+  background-color: #fee2e2 !important;
+  color: #b91c1c !important;
+  border-color: #fecaca !important;
+}
+
+.light-theme .bg-yellow-500\/10 {
+  background-color: #fef9c3 !important;
+  color: #a16207 !important;
+  border-color: #fef08a !important;
+}
+
+.light-theme .bg-pink-500\/10,
+.light-theme .bg-pink-400\/10 {
+  background-color: #fce7f3 !important;
+  color: #be185d !important;
+  border-color: #fbcfe8 !important;
+}
+
+/* Recharts grid lines inside light mode */
+.light-theme .recharts-default-tooltip {
+  background-color: #ffffff !important;
+  border-color: #cbd5e1 !important;
+  box-shadow: 0 4px 6px rgba(15, 23, 42, 0.05) !important;
+}
+.light-theme .recharts-tooltip-label {
+  color: #475569 !important;
+}
+.light-theme .recharts-tooltip-item {
+  color: #0284c7 !important;
+}
+
+/* Navigation tags overrides */
+.light-theme #nav-scanner-button:not(.bg-cyan-500),
+.light-theme #nav-features-button:not(.bg-cyan-500) {
+  color: #64748b !important;
+}
+.light-theme #nav-scanner-button:not(.bg-cyan-500):hover,
+.light-theme #nav-features-button:not(.bg-cyan-500):hover {
+  color: #0f172a !important;
+}
+
+/* Terminal Node Logging Overlay */
+.light-theme .bg-slate-950\/70 {
+  background-color: #f8fafc !important;
+  color: #0e7490 !important;
+  border-color: #06b6d4 !important;
+}
+
+/* Decrease intensity of cyber gradient glow blobs */
+.light-theme .bg-cyan-500\/10,
+.light-theme .bg-purple-600\/10,
+.light-theme .bg-blue-600\/10,
+.light-theme .bg-blue-500\/5 {
+  opacity: 0.25 !important;
+}
+
+.light-theme .bg-gradient-to-r {
+  background-color: transparent !important;
+}
+
+/* ==========================================================================
+   SMOOTH THEME TRANSITION SYSTEM
+   ========================================================================== */
+
+/* Apply beautiful, hyper-fluid, hardware-optimised transitions to backgrounds, borders, colors and opacities */
+.light-theme,
+.dark-theme,
+.light-theme h1, .dark-theme h1,
+.light-theme h2, .dark-theme h2,
+.light-theme h3, .dark-theme h3,
+.light-theme h4, .dark-theme h4,
+.light-theme h5, .dark-theme h5,
+.light-theme p, .dark-theme p,
+.light-theme span, .dark-theme span,
+.light-theme header, .dark-theme header,
+.light-theme button, .dark-theme button,
+.light-theme input, .dark-theme input,
+.light-theme select, .dark-theme select,
+.light-theme div, .dark-theme div,
+.light-theme a, .dark-theme a,
+.light-theme svg, .dark-theme svg,
+.light-theme ul, .dark-theme ul,
+.light-theme li, .dark-theme li {
+  transition-property: background-color, border-color, color, text-shadow, box-shadow, opacity, fill, stroke !important;
+  transition-timing-function: cubic-bezier(0.4, 0, 0.2, 1) !important;
+  transition-duration: 500ms !important;
+}
+
+/* Animate element opacity levels elegantly when transitioning to light mode */
+.light-theme .cyber-deco {
+  opacity: 0.12 !important;
+}
+
+.light-theme .cyber-grid {
+  opacity: 0.08 !important;
+}
+
+.light-theme .cyber-radar {
+  opacity: 0.05 !important;
+}
+
+.light-theme .cyber-svg {
+  opacity: 0.04 !important;
+}
+
+.light-theme .cyber-rain {
+  opacity: 0.01 !important;
+}

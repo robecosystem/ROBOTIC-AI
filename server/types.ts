@@ -16,6 +16,7 @@ export interface TokenDetails {
   websiteUrl?: string;
   telegramUrl?: string;
   twitterUrl?: string;
+  createdAt?: string;
 }
 
 export interface SecurityFeatures {

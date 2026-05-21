@@ -37,6 +37,10 @@ export function generateDeterministicToken(address: string, chain: string): {
   const volume24h = marketCap * (0.1 + (hash % 40) / 100);
   const priceChange24h = ((hash % 80) - 35) + parseFloat(((hash % 100) / 100).toFixed(2));
 
+  const poolAgeDays = 2 + (hash % 400);
+  const fallbackMs = Date.now() - (poolAgeDays * 24 * 60 * 60 * 1000);
+  const createdAt = new Date(fallbackMs).toLocaleDateString("en-US", { year: "numeric", month: "short", day: "numeric" });
+
   const token: TokenDetails = {
     address,
     name,
@@ -55,6 +59,7 @@ export function generateDeterministicToken(address: string, chain: string): {
     websiteUrl: hash % 3 !== 0 ? `https://${symbol.toLowerCase()}network.io` : undefined,
     telegramUrl: hash % 4 !== 0 ? `https://t.me/${symbol.toLowerCase()}portal` : undefined,
     twitterUrl: hash % 5 !== 0 ? `https://x.com/${symbol.toLowerCase()}_crypto` : undefined,
+    createdAt,
   };
 
   const ownershipRenounced = hash % 5 !== 0;
@@ -117,7 +122,7 @@ export function generateDeterministicToken(address: string, chain: string): {
     lpBurned,
     lockExpiration,
     unlockedLiquidityUSD: (liquidityUSD * lpUnlocked) / 100,
-    poolAgeDays: 2 + (hash % 400),
+    poolAgeDays,
     dexName: chain === "Solana" ? "Raydium" : chain === "Base" ? "Uniswap V3" : "PancakeSwap",
     pairAddress: `0x${address.substring(4, 8)}...${address.substring(address.length - 6)}`
   };
@@ -300,6 +305,110 @@ export function generateHeuristicScores(
   };
 }
 
+// Fetch GoPlus security details if available for real-world audits
+async function fetchGoPlusSecurityClient(address: string, chainName: string): Promise<Partial<SecurityFeatures> | null> {
+  const normalizedChain = chainName.toLowerCase();
+  
+  // Map our chain strings to GoPlus Chain IDs
+  let goPlusChainId = "";
+  if (normalizedChain === "ethereum" || normalizedChain === "eth") goPlusChainId = "1";
+  else if (normalizedChain === "bnb smart chain" || normalizedChain === "bsc") goPlusChainId = "56";
+  else if (normalizedChain === "base") goPlusChainId = "8453";
+  else if (normalizedChain === "arbitrum" || normalizedChain === "arb") goPlusChainId = "42161";
+  else if (normalizedChain === "polygon" || normalizedChain === "matic") goPlusChainId = "137";
+  else if (normalizedChain === "avalanche" || normalizedChain === "avax") goPlusChainId = "43114";
+  
+  try {
+    if (normalizedChain === "solana" || normalizedChain === "sol") {
+      const goPlusUrl = `https://api.gopluslabs.io/api/v1/solana/token_security?contract_addresses=${address}`;
+      const response = await fetch(goPlusUrl);
+      if (response.ok) {
+        const data = await response.json();
+        if (data && data.code === 1 && data.result) {
+          const solData = data.result[address] || Object.values(data.result)[0];
+          if (solData) {
+            const mintable = !!solData.mint_authority;
+            const freezable = !!solData.freeze_authority;
+            const ownershipRenounced = !solData.mint_authority;
+            const buyTax = parseFloat(solData.buy_tax) || 0;
+            const sellTax = parseFloat(solData.sell_tax) || 0;
+            const honeypot = solData.is_honeypot === "1";
+            
+            const warnings: string[] = [];
+            if (honeypot) warnings.push("Honeypot risk detected on Solana DEX routing.");
+            if (mintable) warnings.push("Mint Authority is ACTIVE. Token supply is inflationary.");
+            if (freezable) warnings.push("Freeze Authority is ACTIVE. Balance transfers can be locked.");
+
+            return {
+              ownershipRenounced,
+              mintable,
+              freezable,
+              honeypot,
+              buyTax,
+              sellTax,
+              blacklisted: solData.is_blacklisted === "1",
+              paused: false,
+              isProxy: false,
+              ownerAddress: solData.owner_address || solData.mint_authority || "",
+              warnings
+            };
+          }
+        }
+      }
+    } else if (goPlusChainId) {
+      const goPlusUrl = `https://api.gopluslabs.io/api/v1/token_security/${goPlusChainId}?contract_addresses=${address}`;
+      const response = await fetch(goPlusUrl);
+      if (response.ok) {
+        const data = await response.json();
+        if (data && data.code === 1 && data.result) {
+          const evmData = data.result[address.toLowerCase()] || data.result[address] || Object.values(data.result)[0];
+          if (evmData) {
+            const ownerAddress = evmData.owner_address || "";
+            const ownershipRenounced = !ownerAddress || 
+              ownerAddress === "0x0000000000000000000000000000000000000000" || 
+              ownerAddress === "0x000000000000000000000000000000000000dead";
+
+            const mintable = evmData.is_mintable === "1";
+            const freezable = evmData.is_blacklisted === "1" || evmData.is_whitelisted === "1" || evmData.transfer_pausable === "1";
+            const honeypot = evmData.is_honeypot === "1";
+            const buyTax = parseFloat(evmData.buy_tax) || 0;
+            const sellTax = parseFloat(evmData.sell_tax) || 0;
+            const paused = evmData.transfer_pausable === "1";
+            const isProxy = evmData.is_proxy === "1";
+            const blacklisted = evmData.is_blacklisted === "1";
+
+            const warnings: string[] = [];
+            if (honeypot) warnings.push("Honeypot code pattern detected! High risk of immediate loss.");
+            if (buyTax > 10) warnings.push(`Extremely high buy tax detected: ${buyTax}%`);
+            if (sellTax > 10) warnings.push(`Extremely high sell tax detected: ${sellTax}%`);
+            if (!ownershipRenounced) warnings.push("Contract owner still has active control privileges.");
+            if (mintable) warnings.push("Mint function is unlocked. Owner can inflate supply at will.");
+            if (paused) warnings.push("Trading pause authority is enabled.");
+            if (isProxy) warnings.push("Proxy contract structure detected. Features can be upgraded without audit.");
+
+            return {
+              ownershipRenounced,
+              mintable,
+              freezable,
+              honeypot,
+              buyTax,
+              sellTax,
+              blacklisted,
+              paused,
+              isProxy,
+              ownerAddress,
+              warnings
+            };
+          }
+        }
+      }
+    }
+  } catch (error) {
+    console.error("[GoPlus API Client] Failed to fetch safety indicators:", error);
+  }
+  return null;
+}
+
 // Full client-side lookup that acts as 100% perfect standby backup
 export async function clientSideAnalyze(address: string, chainName: string): Promise<FullAnalysisResponse> {
   const trimmedAddr = address.trim();
@@ -310,6 +419,14 @@ export async function clientSideAnalyze(address: string, chainName: string): Pro
     const res = await fetch(`https://api.dexscreener.com/latest/dex/tokens/${trimmedAddr}`);
     if (res.ok) {
       fetchedData = await res.json();
+    }
+
+    // Double endpoint query backup
+    if (!fetchedData || !fetchedData.pairs || fetchedData.pairs.length === 0) {
+      const searchRes = await fetch(`https://api.dexscreener.com/latest/dex/search?q=${trimmedAddr}`);
+      if (searchRes.ok) {
+        fetchedData = await searchRes.json();
+      }
     }
   } catch (err) {
     console.warn("Direct browser DexScreener fetch bypass failed, falling back to simulation:", err);
@@ -340,6 +457,10 @@ export async function clientSideAnalyze(address: string, chainName: string): Pro
 
     const base = generateDeterministicToken(trimmedAddr, chain);
 
+    const createdAt = pair.pairCreatedAt
+      ? new Date(pair.pairCreatedAt).toLocaleDateString("en-US", { year: "numeric", month: "short", day: "numeric" })
+      : base.token.createdAt;
+
     const liveToken: TokenDetails = {
       ...base.token,
       name: baseToken.name || base.token.name,
@@ -355,13 +476,8 @@ export async function clientSideAnalyze(address: string, chainName: string): Pro
       websiteUrl: websiteUrl || base.token.websiteUrl,
       telegramUrl: telegramUrl || base.token.telegramUrl,
       twitterUrl: twitterUrl || base.token.twitterUrl,
+      createdAt,
     };
-
-    let isSafeLp = liquidityUSD > 10000;
-    let finalSecurityScore = base.security.securityScore;
-    if (isSafeLp && finalSecurityScore < 50) {
-      finalSecurityScore += 15;
-    }
 
     const priceHistory: PriceHistoryPoint[] = [];
     for (let i = 11; i >= 0; i--) {
@@ -381,17 +497,49 @@ export async function clientSideAnalyze(address: string, chainName: string): Pro
       dexName: pair.dexId ? pair.dexId.toUpperCase() : base.liquidity.dexName,
     };
 
-    const aiScores = generateHeuristicScores(liveToken, base.security, liveLiquidity, base.holders, base.socials);
+    // Client-side GoPlus integration
+    let liveSecurity = { ...base.security };
+    const goPlusSec = await fetchGoPlusSecurityClient(trimmedAddr, chain);
+    if (goPlusSec) {
+      let liveScore = 95;
+      if (goPlusSec.honeypot) liveScore -= 70;
+      if (!goPlusSec.ownershipRenounced) liveScore -= 15;
+      if (goPlusSec.mintable) liveScore -= 20;
+      if (goPlusSec.freezable) liveScore -= 15;
+      if ((goPlusSec.buyTax ?? 0) > 10 || (goPlusSec.sellTax ?? 0) > 10) liveScore -= 15;
+      if (goPlusSec.isProxy) liveScore -= 10;
+      liveScore = Math.max(5, Math.min(99, liveScore));
+
+      liveSecurity = {
+        ownershipRenounced: goPlusSec.ownershipRenounced ?? base.security.ownershipRenounced,
+        mintable: goPlusSec.mintable ?? base.security.mintable,
+        freezable: goPlusSec.freezable ?? base.security.freezable,
+        honeypot: goPlusSec.honeypot ?? base.security.honeypot,
+        sellTax: goPlusSec.sellTax ?? base.security.sellTax,
+        buyTax: goPlusSec.buyTax ?? base.security.buyTax,
+        blacklisted: goPlusSec.blacklisted ?? base.security.blacklisted,
+        paused: goPlusSec.paused ?? base.security.paused,
+        isProxy: goPlusSec.isProxy ?? base.security.isProxy,
+        securityScore: liveScore,
+        ownerAddress: goPlusSec.ownerAddress || base.security.ownerAddress,
+        risksCount: goPlusSec.warnings ? goPlusSec.warnings.length : base.security.risksCount,
+        warnings: goPlusSec.warnings || base.security.warnings
+      };
+    } else {
+      let isSafeLp = liquidityUSD > 10000;
+      if (isSafeLp && liveSecurity.securityScore < 50) {
+        liveSecurity.securityScore += 15;
+      }
+    }
+
+    const aiScores = generateHeuristicScores(liveToken, liveSecurity, liveLiquidity, base.holders, base.socials);
 
     return {
       address: trimmedAddr,
       chain: chain.charAt(0).toUpperCase() + chain.slice(1),
       detectedAt: new Date().toISOString(),
       token: liveToken,
-      security: {
-        ...base.security,
-        securityScore: finalSecurityScore
-      },
+      security: liveSecurity,
       liquidity: liveLiquidity,
       holders: base.holders,
       priceHistory,

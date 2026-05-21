@@ -41,6 +41,10 @@ export function generateDeterministicToken(address: string, chain: string): {
   const volume24h = marketCap * (0.1 + (hash % 40) / 100);
   const priceChange24h = ((hash % 80) - 35) + parseFloat(((hash % 100) / 100).toFixed(2));
 
+  const poolAgeDays = 2 + (hash % 400);
+  const fallbackMs = Date.now() - (poolAgeDays * 24 * 60 * 60 * 1000);
+  const createdAt = new Date(fallbackMs).toLocaleDateString("en-US", { year: "numeric", month: "short", day: "numeric" });
+
   const token: TokenDetails = {
     address,
     name,
@@ -59,6 +63,7 @@ export function generateDeterministicToken(address: string, chain: string): {
     websiteUrl: hash % 3 !== 0 ? `https://${symbol.toLowerCase()}network.io` : undefined,
     telegramUrl: hash % 4 !== 0 ? `https://t.me/${symbol.toLowerCase()}portal` : undefined,
     twitterUrl: hash % 5 !== 0 ? `https://x.com/${symbol.toLowerCase()}_crypto` : undefined,
+    createdAt,
   };
 
   // Security Assessment
@@ -124,7 +129,7 @@ export function generateDeterministicToken(address: string, chain: string): {
     lpBurned,
     lockExpiration,
     unlockedLiquidityUSD: (liquidityUSD * lpUnlocked) / 100,
-    poolAgeDays: 2 + (hash % 400),
+    poolAgeDays,
     dexName: chain === "Solana" ? "Raydium" : chain === "Base" ? "Uniswap V3" : "PancakeSwap",
     pairAddress: `0x${address.substring(4, 8)}...${address.substring(address.length - 6)}`
   };
@@ -207,6 +212,115 @@ export function generateDeterministicToken(address: string, chain: string): {
   return { token, security, liquidity, holders, priceHistory, socials };
 }
 
+// Fetch GoPlus security details if available for real-world audits
+async function fetchGoPlusSecurity(address: string, chainName: string): Promise<Partial<SecurityFeatures> | null> {
+  const normalizedChain = chainName.toLowerCase();
+  
+  // Map our chain strings to GoPlus Chain IDs
+  let goPlusChainId = "";
+  if (normalizedChain === "ethereum" || normalizedChain === "eth") goPlusChainId = "1";
+  else if (normalizedChain === "bnb smart chain" || normalizedChain === "bsc") goPlusChainId = "56";
+  else if (normalizedChain === "base") goPlusChainId = "8453";
+  else if (normalizedChain === "arbitrum" || normalizedChain === "arb") goPlusChainId = "42161";
+  else if (normalizedChain === "polygon" || normalizedChain === "matic") goPlusChainId = "137";
+  else if (normalizedChain === "avalanche" || normalizedChain === "avax") goPlusChainId = "43114";
+  
+  try {
+    if (normalizedChain === "solana" || normalizedChain === "sol") {
+      const goPlusUrl = `https://api.gopluslabs.io/api/v1/solana/token_security?contract_addresses=${address}`;
+      console.log(`[GoPlus API] Querying Solana safety metrics for ${address}...`);
+      const response = await fetch(goPlusUrl);
+      if (response.ok) {
+        const data = await response.json();
+        if (data && data.code === 1 && data.result) {
+          const solData = data.result[address] || Object.values(data.result)[0];
+          if (solData) {
+            console.log(`[GoPlus API] Successfully received GoPlus Solana security info for ${address}`);
+            const mintable = !!solData.mint_authority;
+            const freezable = !!solData.freeze_authority;
+            const ownershipRenounced = !solData.mint_authority;
+            
+            const buyTax = parseFloat(solData.buy_tax) || 0;
+            const sellTax = parseFloat(solData.sell_tax) || 0;
+            const honeypot = solData.is_honeypot === "1";
+            
+            const warnings: string[] = [];
+            if (honeypot) warnings.push("Honeypot risk detected on Solana DEX routing.");
+            if (mintable) warnings.push("Mint Authority is ACTIVE. Token supply is inflationary.");
+            if (freezable) warnings.push("Freeze Authority is ACTIVE. Balance transfers can be locked.");
+
+            return {
+              ownershipRenounced,
+              mintable,
+              freezable,
+              honeypot,
+              buyTax,
+              sellTax,
+              blacklisted: solData.is_blacklisted === "1",
+              paused: false,
+              isProxy: false,
+              ownerAddress: solData.owner_address || solData.mint_authority || "",
+              warnings
+            };
+          }
+        }
+      }
+    } else if (goPlusChainId) {
+      const goPlusUrl = `https://api.gopluslabs.io/api/v1/token_security/${goPlusChainId}?contract_addresses=${address}`;
+      console.log(`[GoPlus API] Querying EVM safety metrics for ${address} on chain ID ${goPlusChainId}...`);
+      const response = await fetch(goPlusUrl);
+      if (response.ok) {
+        const data = await response.json();
+        if (data && data.code === 1 && data.result) {
+          const evmData = data.result[address.toLowerCase()] || data.result[address] || Object.values(data.result)[0];
+          if (evmData) {
+            console.log(`[GoPlus API] Successfully received GoPlus EVM security info for ${address}`);
+            const ownerAddress = evmData.owner_address || "";
+            const ownershipRenounced = !ownerAddress || 
+              ownerAddress === "0x0000000000000000000000000000000000000000" || 
+              ownerAddress === "0x000000000000000000000000000000000000dead";
+
+            const mintable = evmData.is_mintable === "1";
+            const freezable = evmData.is_blacklisted === "1" || evmData.is_whitelisted === "1" || evmData.transfer_pausable === "1";
+            const honeypot = evmData.is_honeypot === "1";
+            const buyTax = parseFloat(evmData.buy_tax) || 0;
+            const sellTax = parseFloat(evmData.sell_tax) || 0;
+            const paused = evmData.transfer_pausable === "1";
+            const isProxy = evmData.is_proxy === "1";
+            const blacklisted = evmData.is_blacklisted === "1";
+
+            const warnings: string[] = [];
+            if (honeypot) warnings.push("Honeypot code pattern detected! High risk of immediate loss.");
+            if (buyTax > 10) warnings.push(`Extremely high buy tax detected: ${buyTax}%`);
+            if (sellTax > 10) warnings.push(`Extremely high sell tax detected: ${sellTax}%`);
+            if (!ownershipRenounced) warnings.push("Contract owner still has active control privileges.");
+            if (mintable) warnings.push("Mint function is unlocked. Owner can inflate supply at will.");
+            if (paused) warnings.push("Trading pause authority is enabled.");
+            if (isProxy) warnings.push("Proxy contract structure detected. Features can be upgraded without audit.");
+
+            return {
+              ownershipRenounced,
+              mintable,
+              freezable,
+              honeypot,
+              buyTax,
+              sellTax,
+              blacklisted,
+              paused,
+              isProxy,
+              ownerAddress,
+              warnings
+            };
+          }
+        }
+      }
+    }
+  } catch (error) {
+    console.error("[GoPlus API] Failed to fetch GoPlus contract security details:", error);
+  }
+  return null;
+}
+
 // Fetch from DexScreener API with fallback
 export async function fetchTokenAnalysis(address: string, chainName: string): Promise<{
   token: TokenDetails;
@@ -217,95 +331,139 @@ export async function fetchTokenAnalysis(address: string, chainName: string): Pr
   socials: SocialMetrics;
 }> {
   try {
-    const response = await fetch(`https://api.dexscreener.com/latest/dex/tokens/${address}`);
+    // Attempt standard single-token lookup first
+    let response = await fetch(`https://api.dexscreener.com/latest/dex/tokens/${address}`);
+    let data: any = null;
     if (response.ok) {
-      const data = await response.json();
-      if (data && data.pairs && data.pairs.length > 0) {
-        const pair = data.pairs[0];
-        const chain = pair.chainId || chainName;
-        const baseToken = pair.baseToken;
-        const price = parseFloat(pair.priceUsd) || 0;
-        const volume24h = parseFloat(pair.volume?.h24) || 0;
-        const marketCap = parseFloat(pair.fdv) * 0.75 || parseFloat(pair.marketCap) || 0;
-        const fdv = parseFloat(pair.fdv) || marketCap || 0;
-        const liquidityUSD = parseFloat(pair.liquidity?.usd) || 0;
-        const priceChange24h = parseFloat(pair.priceChange?.h24) || 0;
+      data = await response.json();
+    }
 
-        // Custom website/social parsing if present in DexScreener links
-        let websiteUrl: string | undefined;
-        let telegramUrl: string | undefined;
-        let twitterUrl: string | undefined;
-
-        if (pair.websites && pair.websites.length > 0) websiteUrl = pair.websites[0].url;
-        if (pair.socials) {
-          for (const item of pair.socials) {
-            if (item.type === 'telegram') telegramUrl = item.url;
-            if (item.type === 'twitter') twitterUrl = item.url;
-          }
-        }
-
-        // Generate baseline security/liquidity/holders/history indicators, augmented with live DexScreener stats!
-        const base = generateDeterministicToken(address, chain);
-
-        // Map live properties from DexScreener onto our generated sandbox metrics
-        const liveToken: TokenDetails = {
-          ...base.token,
-          name: baseToken.name || base.token.name,
-          symbol: baseToken.symbol || base.token.symbol,
-          chain: chain.charAt(0).toUpperCase() + chain.slice(1),
-          price,
-          marketCap: marketCap || base.token.marketCap,
-          fdv: fdv || base.token.fdv,
-          liquidityUSD: liquidityUSD || base.token.liquidityUSD,
-          volume24h: volume24h || base.token.volume24h,
-          priceChange24h: priceChange24h || base.token.priceChange24h,
-          logoUrl: pair.info?.imageUrl || "",
-          websiteUrl: websiteUrl || base.token.websiteUrl,
-          telegramUrl: telegramUrl || base.token.telegramUrl,
-          twitterUrl: twitterUrl || base.token.twitterUrl,
-        };
-
-        // Adjust security levels if liquidity pool matches standard triggers
-        let isSafeLp = liquidityUSD > 10000;
-        let finalSecurityScore = base.security.securityScore;
-        if (isSafeLp && finalSecurityScore < 50) {
-          finalSecurityScore += 15; // enhance score since it has solid live pool funding
-        }
-
-        // Construct live price history relative to live price
-        const priceHistory: PriceHistoryPoint[] = [];
-        for (let i = 11; i >= 0; i--) {
-          const timeStr = `${i * 2}h ago`;
-          const factor = 1 - (priceChange24h / 100) * (i / 12) + (Math.sin(i / 2) * 0.05);
-          priceHistory.push({
-            time: timeStr,
-            price: Math.max(0.000001, price * factor),
-            volume: volume24h / 12 * (0.5 + Math.random() * 0.5)
-          });
-        }
-
-        const liveLiquidity: LiquidityDetails = {
-          ...base.liquidity,
-          unlockedLiquidityUSD: (liquidityUSD * (100 - base.liquidity.lpLocked)) / 100,
-          pairAddress: pair.pairAddress || base.liquidity.pairAddress,
-          dexName: pair.dexId ? pair.dexId.toUpperCase() : base.liquidity.dexName,
-        };
-
-        return {
-          token: liveToken,
-          security: {
-            ...base.security,
-            securityScore: finalSecurityScore
-          },
-          liquidity: liveLiquidity,
-          holders: base.holders,
-          priceHistory,
-          socials: {
-            ...base.socials,
-            websiteQualityScore: websiteUrl ? 88 : base.socials.websiteQualityScore
-          }
-        };
+    // Try robust query-based search endpoint if tokens endpoint has no pairs
+    if (!data || !data.pairs || data.pairs.length === 0) {
+      console.log(`[DexScreener] Checking alternate search route for address: ${address}...`);
+      const searchRes = await fetch(`https://api.dexscreener.com/latest/dex/search?q=${address}`);
+      if (searchRes.ok) {
+        data = await searchRes.json();
       }
+    }
+
+    if (data && data.pairs && data.pairs.length > 0) {
+      const pair = data.pairs[0];
+      const chain = pair.chainId || chainName;
+      const baseToken = pair.baseToken;
+      const price = parseFloat(pair.priceUsd) || 0;
+      const volume24h = parseFloat(pair.volume?.h24) || 0;
+      const marketCap = parseFloat(pair.fdv) * 0.75 || parseFloat(pair.marketCap) || 0;
+      const fdv = parseFloat(pair.fdv) || marketCap || 0;
+      const liquidityUSD = parseFloat(pair.liquidity?.usd) || 0;
+      const priceChange24h = parseFloat(pair.priceChange?.h24) || 0;
+
+      // Custom website/social parsing if present in DexScreener links
+      let websiteUrl: string | undefined;
+      let telegramUrl: string | undefined;
+      let twitterUrl: string | undefined;
+
+      if (pair.websites && pair.websites.length > 0) websiteUrl = pair.websites[0].url;
+      if (pair.socials) {
+        for (const item of pair.socials) {
+          if (item.type === 'telegram') telegramUrl = item.url;
+          if (item.type === 'twitter') twitterUrl = item.url;
+        }
+      }
+
+      // Generate baseline details from deterministic fallback
+      const base = generateDeterministicToken(address, chain);
+
+      const createdAt = pair.pairCreatedAt
+        ? new Date(pair.pairCreatedAt).toLocaleDateString("en-US", { year: "numeric", month: "short", day: "numeric" })
+        : base.token.createdAt;
+
+      // Map live properties from DexScreener
+      const liveToken: TokenDetails = {
+        ...base.token,
+        name: baseToken.name || base.token.name,
+        symbol: baseToken.symbol || base.token.symbol,
+        chain: chain.charAt(0).toUpperCase() + chain.slice(1),
+        price,
+        marketCap: marketCap || base.token.marketCap,
+        fdv: fdv || base.token.fdv,
+        liquidityUSD: liquidityUSD || base.token.liquidityUSD,
+        volume24h: volume24h || base.token.volume24h,
+        priceChange24h: priceChange24h || base.token.priceChange24h,
+        logoUrl: pair.info?.imageUrl || "",
+        websiteUrl: websiteUrl || base.token.websiteUrl,
+        telegramUrl: telegramUrl || base.token.telegramUrl,
+        twitterUrl: twitterUrl || base.token.twitterUrl,
+        createdAt,
+      };
+
+      // Construct live price history relative to live price
+      const priceHistory: PriceHistoryPoint[] = [];
+      for (let i = 11; i >= 0; i--) {
+        const timeStr = `${i * 2}h ago`;
+        const factor = 1 - (priceChange24h / 100) * (i / 12) + (Math.sin(i / 2) * 0.05);
+        priceHistory.push({
+          time: timeStr,
+          price: Math.max(0.000001, price * factor),
+          volume: volume24h / 12 * (0.5 + Math.random() * 0.5)
+        });
+      }
+
+      const liveLiquidity: LiquidityDetails = {
+        ...base.liquidity,
+        unlockedLiquidityUSD: (liquidityUSD * (100 - base.liquidity.lpLocked)) / 100,
+        pairAddress: pair.pairAddress || base.liquidity.pairAddress,
+        dexName: pair.dexId ? pair.dexId.toUpperCase() : base.liquidity.dexName,
+      };
+
+      // Fetch actual security audit indicators from GoPlus API
+      let liveSecurity = { ...base.security };
+      const goPlusSec = await fetchGoPlusSecurity(address, chain);
+      if (goPlusSec) {
+        // Calculate a precise live security score based on authentic parameters
+        let liveScore = 95;
+        if (goPlusSec.honeypot) liveScore -= 70;
+        if (!goPlusSec.ownershipRenounced) liveScore -= 15;
+        if (goPlusSec.mintable) liveScore -= 20;
+        if (goPlusSec.freezable) liveScore -= 15;
+        if ((goPlusSec.buyTax ?? 0) > 10 || (goPlusSec.sellTax ?? 0) > 10) liveScore -= 15;
+        if (goPlusSec.isProxy) liveScore -= 10;
+        liveScore = Math.max(5, Math.min(99, liveScore));
+
+        liveSecurity = {
+          ownershipRenounced: goPlusSec.ownershipRenounced ?? base.security.ownershipRenounced,
+          mintable: goPlusSec.mintable ?? base.security.mintable,
+          freezable: goPlusSec.freezable ?? base.security.freezable,
+          honeypot: goPlusSec.honeypot ?? base.security.honeypot,
+          sellTax: goPlusSec.sellTax ?? base.security.sellTax,
+          buyTax: goPlusSec.buyTax ?? base.security.buyTax,
+          blacklisted: goPlusSec.blacklisted ?? base.security.blacklisted,
+          paused: goPlusSec.paused ?? base.security.paused,
+          isProxy: goPlusSec.isProxy ?? base.security.isProxy,
+          securityScore: liveScore,
+          ownerAddress: goPlusSec.ownerAddress || base.security.ownerAddress,
+          risksCount: goPlusSec.warnings ? goPlusSec.warnings.length : base.security.risksCount,
+          warnings: goPlusSec.warnings || base.security.warnings
+        };
+      } else {
+        // Boost security score if liquidity is highly healthy
+        let isSafeLp = liquidityUSD > 10000;
+        if (isSafeLp && liveSecurity.securityScore < 50) {
+          liveSecurity.securityScore += 15;
+        }
+      }
+
+      return {
+        token: liveToken,
+        security: liveSecurity,
+        liquidity: liveLiquidity,
+        holders: base.holders,
+        priceHistory,
+        socials: {
+          ...base.socials,
+          websiteQualityScore: websiteUrl ? 88 : base.socials.websiteQualityScore
+        }
+      };
     }
   } catch (error) {
     console.error("DexScreener API lookup failed, falling back to fully deterministic analyzer:", error);

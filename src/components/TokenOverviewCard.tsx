@@ -39,6 +39,32 @@ export default function TokenOverviewCard({ token }: Props) {
     ? Math.min(100, Math.round((token.circulatingSupply / token.totalSupply) * 100))
     : 100;
 
+  const getExplorerUrl = (chainName: string, addr: string) => {
+    const normalized = chainName.toLowerCase();
+    if (normalized === "solana" || normalized === "sol") {
+      return `https://solscan.io/token/${addr}`;
+    }
+    if (normalized === "ethereum" || normalized === "eth") {
+      return `https://etherscan.io/address/${addr}#code`;
+    }
+    if (normalized === "base") {
+      return `https://basescan.org/address/${addr}#code`;
+    }
+    if (normalized === "bnb smart chain" || normalized === "bsc") {
+      return `https://bscscan.com/address/${addr}#code`;
+    }
+    if (normalized === "arbitrum" || normalized === "arb") {
+      return `https://arbiscan.io/address/${addr}#code`;
+    }
+    if (normalized === "polygon" || normalized === "matic") {
+      return `https://polygonscan.com/address/${addr}#code`;
+    }
+    if (normalized === "avalanche" || normalized === "avax") {
+      return `https://snowtrace.io/address/${addr}#code`;
+    }
+    return `https://etherscan.io/address/${addr}`;
+  };
+
   return (
     <div className="relative border border-white/10 rounded-2xl bg-white/5 backdrop-blur-md p-6 overflow-hidden h-full flex flex-col justify-between">
       {/* Decorative neon corner */}
@@ -85,19 +111,32 @@ export default function TokenOverviewCard({ token }: Props) {
         {/* Copy Contract Address */}
         <div className="mt-4 flex items-center gap-2 bg-slate-900/60 border border-slate-800 rounded-lg px-3 py-2">
           <span className="text-xs font-mono text-slate-500 uppercase">ADD:</span>
-          <span className="text-xs font-mono text-slate-300 select-all truncate flex-1 md:block hidden">
+          <span className="text-xs font-mono text-slate-300 select-all truncate flex-1 md:block hidden" id="token-address-full">
             {token.address}
           </span>
-          <span className="text-xs font-mono text-slate-300 select-all truncate flex-1 md:hidden block">
+          <span className="text-xs font-mono text-slate-300 select-all truncate flex-1 md:hidden block" id="token-address-pad">
             {padAddress(token.address)}
           </span>
-          <button 
-            onClick={copyAddress}
-            className="p-1 hover:bg-slate-800 rounded text-slate-400 hover:text-cyan-400 transition"
-            title="Copy Contract Address"
-          >
-            {copied ? <Check className="w-4 h-4 text-emerald-400" /> : <Copy className="w-4 h-4" />}
-          </button>
+          <div className="flex items-center gap-1 shrink-0">
+            <button 
+              onClick={copyAddress}
+              className="p-1 hover:bg-slate-800 rounded text-slate-400 hover:text-cyan-400 transition"
+              title="Copy Contract Address"
+              id="copy-address-button"
+            >
+              {copied ? <Check className="w-4 h-4 text-emerald-400" /> : <Copy className="w-4 h-4" />}
+            </button>
+            <a
+              href={getExplorerUrl(token.chain, token.address)}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="p-1 hover:bg-slate-800 rounded text-slate-400 hover:text-cyan-400 transition"
+              title="View verified contract code on explorer"
+              id="view-code-explorer-link"
+            >
+              <ExternalLink className="w-4 h-4" />
+            </a>
+          </div>
         </div>
 
         {/* Metric grids */}
@@ -154,6 +193,14 @@ export default function TokenOverviewCard({ token }: Props) {
             <span>Total: {token.totalSupply.toLocaleString(undefined, { maximumFractionDigits: 0 })}</span>
           </div>
         </div>
+
+        {/* Live Contract / Pool creation date display */}
+        {token.createdAt && (
+          <div className="mt-4 p-3 bg-slate-900/35 border border-slate-800/50 rounded-lg flex items-center justify-between font-mono text-xs">
+            <span className="text-slate-500 uppercase text-[10px]">Contract Created</span>
+            <span className="text-cyan-400 font-bold">{token.createdAt}</span>
+          </div>
+        )}
       </div>
 
       {/* Social Links External Panel */}

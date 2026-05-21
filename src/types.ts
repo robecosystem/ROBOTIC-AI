@@ -16,6 +16,7 @@ export interface TokenDetails {
   websiteUrl?: string;
   telegramUrl?: string;
   twitterUrl?: string;
+  createdAt?: string;
 }
 
 export interface SecurityFeatures {
@@ -125,3 +126,80 @@ export interface ScanHistoryItem {
   score: number;
   time: string;
 }
+
+export interface AdCampaign {
+  id: string;
+  tokenAddress: string;
+  tokenName: string;
+  tokenSymbol: string;
+  tagline: string;
+  bannerUrl?: string;
+  chain: string;
+  budgetRob: number;
+  durationDays: number;
+  approved: boolean;
+  createdAt: string;
+}
+
+export interface LockedLiquidityToken {
+  address: string;
+  name: string;
+  symbol: string;
+  chain: string;
+  lockPlatform: string;
+  lockedAmountUSD: number;
+  lockedPercentage: number;
+  burnPercentage: number;
+  contractCreator: string;
+  lockDurationMonths: number;
+  lockTimestamp: string;
+  unlockTimeReadable: string;
+  liquidityPoolOnDex: string;
+}
+
+export interface AirdropParticipant {
+  walletAddress: string;
+  completedTasks: string[];
+  completedPercentage: number;
+  eligible: boolean;
+  claimed: boolean;
+  claimTxSignature?: string;
+  joinedAt: string;
+}
+
+export interface AirdropCampaign {
+  id: string;
+  projectName: string;
+  tokenName: string;
+  tokenSymbol: string;
+  tokenContractAddress: string;
+  totalAirdropSupply: number;
+  winnersCount: number;
+  rewardPerUser: number;
+  startDate: string;
+  endDate: string;
+  websiteLink: string;
+  twitterLink: string;
+  telegramLink: string;
+  discordLink: string;
+  description: string;
+  bannerUrl: string;
+  logoUrl: string;
+  requiredTasks: string[];
+  customTasks: string[];
+  active: boolean;
+  creatorAddress: string;
+  paymentSignature: string;
+  createdAt: string;
+  participants: AirdropParticipant[];
+}
+
+export interface AirdropPayment {
+  signature: string;
+  amount: number;
+  feeType: string;
+  walletAddress: string;
+  timestamp: string;
+}
+
+
